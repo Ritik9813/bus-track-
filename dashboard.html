@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - School Bus Tracking</title>
+    
+    <!-- Google Maps API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCYhRSGpHuGG4lbAPl9e17y-3yqqRoQba0 "></script>
+
+    <script>
+        let map, busMarker, userMarker, directionsService, directionsRenderer, geocoder;
+        let busPosition = { lat: 30.6952, lng: 76.7986 }; // Starting Bus Position (Chandigarh Bus Station)
+        let userPosition = null; // User Position
+        let distance = 17; // Initial Distance (17 km)
+        let speed = Math.floor(Math.random() * (40 - 10 + 1)) + 10; // Random Speed between 10-40 km/h
+        let interval = null;
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: busPosition,
+                zoom: 12,
+                mapTypeId: 'roadmap' // Default Normal Map View
+            });
+
+            busMarker = new google.maps.Marker({
+                position: busPosition,
+                map: map,
+                title: "Bus Location",
+                icon: "https://maps.google.com/mapfiles/kml/shapes/bus.png"
+            });
+
+            userMarker = new google.maps.Marker({
+                map: map,
+                title: "Your Location",
+                icon: "https://maps.google.com/mapfiles/kml/pal3/icon49.png"
+            });
+
+            directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer({ suppressMarkers: true });
+            directionsRenderer.setMap(map);
+
+            geocoder = new google.maps.Geocoder();
+
+            updateLocation();
+            interval = setInterval(updateLocation, 5000); // Update Every 5 Seconds
+        }
+
+        function updateLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        userPosition = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        userMarker.setPosition(userPosition);
+
+                        moveBusTowardsUser();
+                        updateLocationNames();
+                    },
+                    (error) => {
+                        console.error('Error getting location:', error);
+                        alert('Error getting location. Please enable GPS and try again.');
+                    },
+                    { enableHighAccuracy: true }
+                );
+            } else {
+                alert('Geolocation is not supported by this browser.');
+            }
+        }
+
+        function moveBusTowardsUser() {
+            if (!userPosition) return;
+
+            let distanceMoved = speed / 3600 * 5; // Distance moved in 5 seconds
+            let newLat = busPosition.lat + (userPosition.lat - busPosition.lat) * (distanceMoved / distance);
+            let newLng = busPosition.lng + (userPosition.lng - busPosition.lng) * (distanceMoved / distance);
+
+            busPosition = { lat: newLat, lng: newLng };
+            busMarker.setPosition(busPosition);
+            calculateAndDisplayRoute();
+
+            distance -= distanceMoved;
+            if (distance <= 0) {
+                clearInterval(interval);
+                distance = 0;
+                speed = 0;
+                alert("🚍 The bus has reached your location!");
+            }
+
+            document.getElementById('distance').innerText = `Distance: ${distance.toFixed(1)} km`;
+            document.getElementById('speed').innerText = `Speed: ${speed} km/h`;
+            document.getElementById('eta').innerText = `ETA: ${(distance / speed * 60).toFixed(0)} min`;
+        }
+
+        function calculateAndDisplayRoute() {
+            const request = {
+                origin: busPosition,
+                destination: userPosition,
+                travelMode: 'DRIVING'
+            };
+
+            directionsService.route(request, (result, status) => {
+                if (status === 'OK') {
+                    directionsRenderer.setDirections(result);
+                }
+            });
+        }
+
+        function updateLocationNames() {
+            geocoder.geocode({ location: busPosition }, (results, status) => {
+                document.getElementById("busLocation").innerText = (status === "OK" && results[0]) ? `Bus Location: ${results[0].formatted_address}` : "Bus Location: Loading...";
+            });
+
+            geocoder.geocode({ location: userPosition }, (results, status) => {
+                document.getElementById("userLocation").innerText = (status === "OK" && results[0]) ? `Your Location: ${results[0].formatted_address}` : "Your Location: Loading...";
+            });
+        }
+
+        function toggleMapType() {
+            const currentType = map.getMapTypeId();
+            map.setMapTypeId(currentType === 'roadmap' ? 'satellite' : 'roadmap');
+        }
+
+        window.onload = initMap;
+    </script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            background-color: #4CAF50;
+            color: white;
+        }
+        h2 { padding: 20px 0; }
+        .dashboard-container {
+            width: 90%;
+            max-width: 800px;
+            margin: auto;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+            color: black;
+        }
+        .driver-info {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .driver-photo {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin-right: 15px;
+            border: 2px solid #333;
+        }
+        .driver-details { text-align: left; }
+        #map {
+            width: 100%;
+            height: 400px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+        }
+        .logout-btn, .toggle-map-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            margin: 10px;
+            text-decoration: none;
+            color: white;
+            transition: background 0.3s;
+        }
+        .logout-btn { background-color: red; }
+        .logout-btn:hover { background-color: darkred; }
+        .toggle-map-btn { background-color: #007BFF; }
+        .toggle-map-btn:hover { background-color: #0056b3; }
+        .info-box { margin-top: 10px; font-size: 16px; color: black; }
+    </style>
+</head>
+<body>
+    <h2>School Bus Tracking</h2>
+    
+    <div class="dashboard-container">
+        <div class="driver-info">
+            <img src="{{ url_for('static', filename='images/d.jpg') }}" alt="Driver Photo" class="driver-photo">
+            <div class="driver-details">
+                <strong>Driver Name:</strong> John Doe<br>
+                <strong>Contact:</strong> +1 234-567-890
+            </div>
+        </div>
+
+        <div id="busLocation">Bus Location: Loading...</div>
+        <div id="userLocation">Your Location: Loading...</div>
+        <div id="map"></div>
+
+        <div class="info-box" id="distance">Distance: 17 km</div>
+        <div class="info-box" id="speed">Speed: Loading...</div>
+        <div class="info-box" id="eta">ETA: Loading...</div>
+
+        <a href="/logout" class="logout-btn">Logout</a>
+        <button class="toggle-map-btn" onclick="toggleMapType()">Toggle Map Type</button>
+    </div>
+</body>
+</html>
